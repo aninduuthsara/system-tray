@@ -2,7 +2,7 @@
 
 **Windows-style background apps & system tray for GNOME Wayland — crisp icons, instant open, total kill.**
 
-![GNOME Shell](https://img.shields.io/badge/GNOME%20Shell-49%20%7C%2050%20%7C%2051-4a86cf?style=flat-square&logo=gnome)
+![GNOME Shell](https://img.shields.io/badge/GNOME%20Shell-49%20%7C%2050%20%7C%2051+-4a86cf?style=flat-square&logo=gnome)
 ![Wayland](https://img.shields.io/badge/Display-Wayland-orange?style=flat-square)
 ![License](https://img.shields.io/badge/License-GPL--3.0-green?style=flat-square)
 

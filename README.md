@@ -41,3 +41,39 @@ Install directly from [extensions.gnome.org](https://extensions.gnome.org/) once
 1. Clone this repository directly into your GNOME Shell extensions folder:
    ```bash
    git clone https://github.com/aninduuthsara/system-tray.git ~/.local/share/gnome-shell/extensions/system-tray@anindu.uthsara
+   ```
+2. Compile the GSettings schema:
+   ```bash
+   glib-compile-schemas ~/.local/share/gnome-shell/extensions/system-tray@anindu.uthsara/schemas/
+   ```
+3. Log out and log back in (required on Wayland for GNOME Shell to discover a newly added extension directory).
+4. Enable the extension:
+   ```bash
+   gnome-extensions enable system-tray@anindu.uthsara
+   ```
+
+---
+
+## Preferences
+
+Open Extension Settings via:
+```bash
+gnome-extensions prefs system-tray@anindu.uthsara
+```
+* **General:** Configure Top Bar auto-hide, count badge, panel position, view mode (`Background` / `All Apps`), lock preferred mode, kill behavior (`Instant Kill` / `Safe Kill`), inline confirmation, and Custom Apps watchlist.
+* **About:** Extension info and GitHub repository.
+
+---
+
+## Architecture & Resource Efficiency
+
+* **Idle CPU:** ~0% (event-driven DBus & GNOME Shell signals; no polling timers when idle).
+* **Active Refresh:** Updates live process counts every 1.5s *only* while the popup is open.
+* **100% Wayland Native:** Async non-blocking I/O with zero XEmbed/X11 dependencies.
+
+---
+
+## Author & License
+
+* **Author:** [Anindu Uthsara](https://github.com/aninduuthsara)
+* **License:** Licensed under the **GNU General Public License v3.0 (GPL-3.0)** — see the [LICENSE](LICENSE) file for details.

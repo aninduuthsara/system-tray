@@ -10,8 +10,5 @@
     "50",
     "51"
   ],
-  "settings-schema": "org.gnome.shell.extensions.system-tray-anindu",
-  "session-modes": [
-    "user"
-  ]
+  "settings-schema": "org.gnome.shell.extensions.system-tray-anindu"
 }

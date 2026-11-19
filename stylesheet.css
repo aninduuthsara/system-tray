@@ -1,0 +1,299 @@
+/* ============================================================================
+ * System Tray (Anindu Uthsara) - Libadwaita 2026 Native Shell Stylesheet
+ * Compatible with GNOME Shell 51.1 (StTheme)
+ * ============================================================================ */
+
+/* Top Bar Indicator: strip hidden .system-status-icon padding & balance left/middle/right */
+.system-tray-panel-button {
+    -natural-hpadding: 2px;
+    -minimum-hpadding: 2px;
+    padding: 0;
+    margin: 0;
+}
+
+.system-tray-panel-box {
+    spacing: 0px;
+    padding: 0 12px;
+    margin: 0;
+}
+
+.system-tray-panel-button.system-tray-has-badge .system-tray-panel-box {
+    spacing: 6px;
+    padding: 0 6px 0 11px;
+}
+
+.system-tray-panel-icon {
+    icon-size: 16px;
+    padding: 0;
+    margin: 0;
+}
+
+.system-tray-panel-badge {
+    font-size: 8pt;
+    font-weight: 700;
+    text-align: center;
+    min-width: 10px;
+    padding: 1px 6px 2px 6px;
+    border-radius: 99px;
+    background-color: rgba(128, 128, 128, 0.26);
+    margin-left: 0px;
+}
+
+.system-tray-panel-badge-attention {
+    background-color: -st-accent-color;
+    color: -st-accent-fg-color;
+}
+
+/* Outer Two-Tone Shell Container (Large Rounded Corners) */
+.system-tray-menu-popup .popup-menu-content {
+    background-color: #3f3f44;
+    border-radius: 40px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Locked logical width so long/short app names never resize the popup across monitors */
+.system-tray-popup {
+    width: 396px;
+    padding: 0;
+    spacing: 0;
+}
+
+/* Top Section (#36363a) */
+.system-tray-top-section {
+    background-color: #36363a;
+    border-radius: 40px;
+    padding: 12px;
+}
+
+/* ScrollView height is computed dynamically at runtime for exact 3-card fit on any DPI */
+.system-tray-scroll-view {
+    padding: 0;
+    margin: 0;
+}
+
+.system-tray-list-box {
+    spacing: 12px;
+}
+
+/* Each App Pill Container (#48484b) with generous right gap around Kill */
+.system-tray-app-card {
+    border-radius: 99px;
+    padding: 6px 12px 6px 6px;
+    spacing: 8px;
+    background-color: #48484b;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition-duration: 130ms;
+}
+
+.system-tray-app-card-attention {
+    border: 1px solid -st-accent-color;
+}
+
+/* Clickable Open Area (App Container minus Kill Button) */
+.system-tray-open-area {
+    border-radius: 99px;
+    padding: 5px 10px 5px 8px;
+    background-color: transparent;
+    transition-duration: 120ms;
+}
+
+.system-tray-open-area:hover {
+    background-color: #545458;
+}
+
+.system-tray-open-area:active {
+    background-color: #3d3d40;
+}
+
+.system-tray-open-area:insensitive {
+    opacity: 0.50;
+}
+
+.system-tray-open-area-box {
+    spacing: 12px;
+}
+
+.system-tray-app-icon {
+    icon-size: 32px;
+}
+
+.system-tray-info-col {
+    spacing: 3px;
+}
+
+.system-tray-app-name {
+    font-size: 10.5pt;
+    font-weight: 700;
+    color: #ffffff;
+}
+
+.system-tray-subtitle-row {
+    spacing: 7px;
+}
+
+.system-tray-status-pill {
+    font-size: 8pt;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 99px;
+}
+
+.system-tray-status-background {
+    background-color: rgba(53, 132, 228, 0.24);
+    color: #78b4ff;
+}
+
+.system-tray-status-minimized {
+    background-color: rgba(245, 194, 17, 0.24);
+    color: #f9d84b;
+}
+
+.system-tray-status-running {
+    background-color: rgba(46, 194, 126, 0.24);
+    color: #57e389;
+}
+
+.system-tray-status-stopping {
+    background-color: rgba(228, 53, 53, 0.28);
+    color: #ff8080;
+}
+
+.system-tray-meta-text {
+    font-size: 8.5pt;
+    color: rgba(255, 255, 255, 0.72);
+}
+
+/* Always-Red Kill Button (#e43535) with Bigger Text */
+.system-tray-btn-kill {
+    font-size: 11.5pt;
+    font-weight: 800;
+    min-width: 78px;
+    height: 42px;
+    padding: 0 20px;
+    border-radius: 99px;
+    color: #ffffff;
+    background-color: #e43535;
+    border: none;
+    transition-duration: 120ms;
+}
+
+.system-tray-btn-kill:hover {
+    background-color: #f04646;
+}
+
+.system-tray-btn-kill:active {
+    background-color: #b82525;
+}
+
+.system-tray-btn-kill-confirm {
+    font-size: 10.5pt;
+    font-weight: 800;
+    min-width: 78px;
+    height: 42px;
+    padding: 0 18px;
+    border-radius: 99px;
+    color: #ffffff;
+    background-color: #b81d1d;
+    border: 2px solid #ffffff;
+    transition-duration: 120ms;
+}
+
+.system-tray-btn-kill-confirm:active {
+    background-color: #8f1414;
+}
+
+/* Compact Bottom Dock Bar (#3f3f44 with matching #555558 pill buttons) */
+.system-tray-bottom-bar {
+    padding: 12px 14px 12px 14px;
+    spacing: 8px;
+}
+
+.system-tray-bottom-btn {
+    height: 34px;
+    padding: 0 13px;
+    border-radius: 99px;
+    color: #ffffff;
+    background-color: #555558;
+    border: none;
+    transition-duration: 120ms;
+}
+
+.system-tray-bottom-btn:hover {
+    background-color: #656569;
+}
+
+.system-tray-bottom-btn:active {
+    background-color: #424246;
+}
+
+.system-tray-bottom-btn-box {
+    spacing: 6px;
+}
+
+.system-tray-bottom-btn-label {
+    font-size: 9pt;
+    font-weight: 600;
+}
+
+.system-tray-settings-icon {
+    padding-top: 1px;
+}
+
+.system-tray-mode-pill {
+    min-width: 120px;
+    height: 34px;
+    padding: 0 7px 0 13px;
+    border-radius: 99px;
+    color: #ffffff;
+    background-color: #555558;
+    border: none;
+    transition-duration: 120ms;
+}
+
+.system-tray-mode-pill:hover {
+    background-color: #656569;
+}
+
+.system-tray-mode-pill:active {
+    background-color: #424246;
+}
+
+.system-tray-mode-pill-box {
+    spacing: 10px;
+}
+
+.system-tray-mode-pill-label {
+    font-size: 9pt;
+    font-weight: 600;
+}
+
+.system-tray-mode-count {
+    font-size: 9pt;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 99px;
+    background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Empty State */
+.system-tray-empty-box {
+    padding: 28px 16px;
+    spacing: 8px;
+}
+
+.system-tray-empty-icon {
+    icon-size: 36px;
+    opacity: 0.55;
+}
+
+.system-tray-empty-title {
+    font-size: 10.5pt;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.88);
+}
+
+.system-tray-empty-sub {
+    font-size: 8.5pt;
+    color: rgba(255, 255, 255, 0.60);
+}

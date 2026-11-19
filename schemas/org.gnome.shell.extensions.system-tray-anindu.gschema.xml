@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="system-tray-anindu">
+  <schema id="org.gnome.shell.extensions.system-tray-anindu"
+          path="/org/gnome/shell/extensions/system-tray-anindu/">
+
+    <!-- Top Bar Behavior -->
+    <key name="auto-hide-indicator" type="b">
+      <default>true</default>
+      <summary>Auto-hide top bar button</summary>
+      <description>Hide the top bar system tray button completely when no matching background apps are running.</description>
+    </key>
+
+    <key name="show-count-badge" type="b">
+      <default>true</default>
+      <summary>Show running app count badge</summary>
+      <description>Display the number of background running applications next to the top bar icon.</description>
+    </key>
+
+    <key name="panel-position" type="s">
+      <choices>
+        <choice value="left"/>
+        <choice value="center"/>
+        <choice value="right"/>
+      </choices>
+      <default>'right'</default>
+      <summary>Top bar position</summary>
+      <description>Which side of the GNOME top bar to place the indicator on.</description>
+    </key>
+
+    <key name="panel-index" type="i">
+      <range min="0" max="20"/>
+      <default>0</default>
+      <summary>Top bar box index</summary>
+      <description>Order index inside the selected top bar area.</description>
+    </key>
+
+    <!-- Visibility & Filtering -->
+    <key name="visibility-mode" type="s">
+      <choices>
+        <choice value="background-only"/>
+        <choice value="all-running"/>
+      </choices>
+      <default>'background-only'</default>
+      <summary>App visibility mode</summary>
+      <description>Choose whether to show only windowless background apps, include minimized apps, or show all running desktop apps.</description>
+    </key>
+
+    <key name="default-visibility-mode" type="s">
+      <choices>
+        <choice value="background-only"/>
+        <choice value="all-running"/>
+      </choices>
+      <default>'background-only'</default>
+      <summary>Default / Always visibility mode</summary>
+      <description>Preferred view mode to always use when opening the popup if Always Use Default Mode is enabled.</description>
+    </key>
+
+    <key name="always-use-default-mode" type="b">
+      <default>false</default>
+      <summary>Always use default mode</summary>
+      <description>Reset the popup to the preferred mode every time it opens, and use it for top bar filtering.</description>
+    </key>
+
+    <key name="show-process-count" type="b">
+      <default>true</default>
+      <summary>Show process count and source tag</summary>
+      <description>Display subtle metadata such as Packaging type (Flatpak/Native/Custom) and child process count in each app row.</description>
+    </key>
+
+    <!-- Discovery Engines -->
+    <key name="enable-sni-watcher" type="b">
+      <default>true</default>
+      <summary>Enable StatusNotifierWatcher (SNI)</summary>
+      <description>Allow apps like Telegram, OBS, Motrix, and ZapZap to register native tray actions and menus.</description>
+    </key>
+
+    <key name="enable-portal-monitor" type="b">
+      <default>true</default>
+      <summary>Enable XDG Background Portal cross-check</summary>
+      <description>Cross-verify sandboxed Flatpak background applications using org.freedesktop.background.Monitor.</description>
+    </key>
+
+    <!-- Termination & Safety -->
+    <key name="force-quit-mode" type="s">
+      <choices>
+        <choice value="immediate"/>
+        <choice value="escalate"/>
+      </choices>
+      <default>'immediate'</default>
+      <summary>Force Quit behavior</summary>
+      <description>Immediate sends SIGKILL to the entire app cgroup/process tree right away; escalate sends SIGTERM first and SIGKILL after grace period.</description>
+    </key>
+
+    <key name="force-quit-grace-ms" type="i">
+      <range min="200" max="5000"/>
+      <default>800</default>
+      <summary>Escalation grace period (ms)</summary>
+      <description>Milliseconds to wait after SIGTERM before sending SIGKILL when force-quit-mode is set to escalate.</description>
+    </key>
+
+    <key name="confirm-force-quit" type="b">
+      <default>false</default>
+      <summary>Inline confirmation for Force Quit</summary>
+      <description>Require a second confirmation click inside the app row before executing Force Quit.</description>
+    </key>
+
+    <!-- Custom Lists (Stored as JSON strings / App IDs for clean extensibility) -->
+    <key name="custom-watched-apps" type="as">
+      <default>[]</default>
+      <summary>Custom watched applications</summary>
+      <description>JSON entries defining custom user-added apps (executable path, AppImage, desktop ID, or process keyword) to track even without SNI or app.slice.</description>
+    </key>
+
+    <key name="ignored-app-ids" type="as">
+      <default>[]</default>
+      <summary>Ignored application IDs</summary>
+      <description>List of canonical app IDs hidden from the system tray popup.</description>
+    </key>
+
+    <key name="pinned-app-ids" type="as">
+      <default>[]</default>
+      <summary>Pinned application IDs</summary>
+      <description>List of canonical app IDs pinned to the top of the popup list.</description>
+    </key>
+
+  </schema>
+</schemalist>

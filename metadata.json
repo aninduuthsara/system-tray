@@ -1,0 +1,17 @@
+{
+  "uuid": "system-tray@anindu.uthsara",
+  "name": "System Tray",
+  "description": "Windows-style background apps manager and system tray for GNOME Wayland with real app icons, smart open, force kill, and powerful app options.",
+  "author": "Anindu Uthsara",
+  "version": 1,
+  "version-name": "0.1",
+  "shell-version": [
+    "49",
+    "50",
+    "51"
+  ],
+  "settings-schema": "org.gnome.shell.extensions.system-tray-anindu",
+  "session-modes": [
+    "user"
+  ]
+}

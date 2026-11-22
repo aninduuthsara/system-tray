@@ -148,22 +148,42 @@ async function getProcInfoAsync(pid, cancellable) {
     return info;
 }
 
+const PROTECTED_SYSTEM_PROCS = new Set([
+    'systemd', 'gnome-shell', 'mutter', 'xwayland', 'gdm', 'gdm-wayland-session',
+    'gnome-session', 'gnome-session-binary', 'dbus-daemon', 'dbus-broker',
+    'pipewire', 'wireplumber', 'xdg-desktop-portal', 'xdg-document-portal',
+    'xdg-permission-store', 'gsd-xsettings', 'ibus-daemon', 'at-spi-bus-launcher',
+]);
+
+function isSafeAppUnitName(unitName) {
+    if (!unitName || typeof unitName !== 'string')
+        return false;
+    if (/gnome\.shell|gnome\.session|dbus-broker|xdg-desktop-portal|gsd-|wayland/i.test(unitName))
+        return false;
+    return (
+        /^app-(?:flatpak|gnome|kde)-.+\.scope$/i.test(unitName) ||
+        /^app-.+@autostart\.service$/i.test(unitName) ||
+        /^dbus-:[\d.]+-.+@\d+\.service$/i.test(unitName)
+    );
+}
+
 async function resolveAppFamilyPidsAsync(seedPids, cancellable) {
     const roots = new Set();
-    const seedInfos = [];
 
     for (const pid of seedPids) {
         if (!Number.isInteger(pid) || pid <= 1)
             continue;
-        roots.add(pid);
         const info = await getProcInfoAsync(pid, cancellable);
-        seedInfos.push(info);
+        if (!info.comm || PROTECTED_SYSTEM_PROCS.has(info.comm))
+            continue;
 
-        // Walk upward ONLY while parent belongs to the exact same app (e.g. Electron main process)
+        roots.add(pid);
+
+        // Walk upward ONLY while parent belongs to the exact same app
         let cur = info;
         for (let depth = 0; depth < 4 && cur.ppid > 1; depth++) {
             const pInfo = await getProcInfoAsync(cur.ppid, cancellable);
-            if (!pInfo.comm || NEVER_KILL_PARENTS.has(pInfo.comm))
+            if (!pInfo.comm || NEVER_KILL_PARENTS.has(pInfo.comm) || PROTECTED_SYSTEM_PROCS.has(pInfo.comm))
                 break;
 
             const sameComm = cur.comm && pInfo.comm === cur.comm;
@@ -181,81 +201,17 @@ async function resolveAppFamilyPidsAsync(seedPids, cancellable) {
         }
     }
 
-    // Collect all descendants downward from the root processes
+    if (roots.size === 0)
+        return [];
+
     const family = await collectDescendantPidsAsync([...roots], cancellable);
-    const familySet = new Set(family);
-
-    // Also catch sibling processes sharing the exact same executable binary (safe against generic interpreters)
-    const exeTargets = new Set(
-        seedInfos
-            .map(i => i.exe)
-            .filter(e =>
-                e &&
-                !e.endsWith('/bash') &&
-                !e.endsWith('/sh') &&
-                !e.endsWith('/python3') &&
-                !e.endsWith('/java') &&
-                !e.endsWith('/electron')
-            )
-    );
-
-    if (exeTargets.size > 0) {
-        try {
-            const procDir = Gio.File.new_for_path('/proc');
-            const enumerator = await new Promise((resolve, reject) => {
-                procDir.enumerate_children_async(
-                    'standard::name,standard::type',
-                    Gio.FileQueryInfoFlags.NONE,
-                    GLib.PRIORITY_LOW,
-                    cancellable,
-                    (src, res) => {
-                        try {
-                            resolve(src.enumerate_children_finish(res));
-                        } catch (e) {
-                            reject(e);
-                        }
-                    }
-                );
-            });
-            let fInfo;
-            while ((fInfo = enumerator.next_file(cancellable)) !== null) {
-                const name = fInfo.get_name();
-                if (!/^\d+$/.test(name))
-                    continue;
-                const p = parseInt(name, 10);
-                if (p <= 1 || familySet.has(p))
-                    continue;
-                try {
-                    const exeFile = Gio.File.new_for_path(`/proc/${p}/exe`);
-                    const linkInfo = await new Promise((resolve, reject) => {
-                        exeFile.query_info_async(
-                            'standard::symlink-target',
-                            Gio.FileQueryInfoFlags.NONE,
-                            GLib.PRIORITY_LOW,
-                            cancellable,
-                            (src, res) => {
-                                try {
-                                    resolve(src.query_info_finish(res));
-                                } catch (e) {
-                                    reject(e);
-                                }
-                            }
-                        );
-                    });
-                    const target = linkInfo.get_symlink_target() ?? '';
-                    if (exeTargets.has(target))
-                        familySet.add(p);
-                } catch {
-                    // Different user or exited
-                }
-            }
-            enumerator.close(null);
-        } catch {
-            // Ignore
-        }
+    const safePids = [];
+    for (const pid of family) {
+        const pInfo = await getProcInfoAsync(pid, cancellable);
+        if (pInfo.comm && !PROTECTED_SYSTEM_PROCS.has(pInfo.comm))
+            safePids.push(pid);
     }
-
-    return [...familySet];
+    return safePids;
 }
 
 async function spawnKillAsync(signalNum, pids, cancellable) {
@@ -514,14 +470,8 @@ export class ActionsManager {
                     this._cancellable
                 );
                 const [unitName] = idReply.recursiveUnpack();
-                if (
-                    unitName &&
-                    !unitName.startsWith('vte-spawn-') &&
-                    !unitName.startsWith('session') &&
-                    (unitName.startsWith('app-') || unitName.startsWith('dbus-'))
-                ) {
+                if (isSafeAppUnitName(unitName))
                     return unitName;
-                }
             } catch {
                 // Continue to next PID
             }
@@ -595,6 +545,8 @@ export class ActionsManager {
 
     async _killSystemdUnits(unitNames, signalNum) {
         for (const unitName of unitNames) {
+            if (!isSafeAppUnitName(unitName))
+                continue;
             try {
                 await dbusCallAsync(
                     SYSTEMD_BUS,

@@ -74,11 +74,37 @@ class SystemTrayIndicator extends PanelMenu.Button {
                 this._updateIndicatorState();
         }) ?? 0;
 
+        this.connect('destroy', () => {
+            this._destroyed = true;
+            this._disconnectSignals();
+        });
+
         this._updateIndicatorState();
     }
 
+    _disconnectSignals() {
+        if (this._menuSignalId && this.menu) {
+            try {
+                this.menu.disconnect(this._menuSignalId);
+            } catch {
+                // Already disposed
+            }
+            this._menuSignalId = 0;
+        }
+
+        if (this._registry && this._registrySignalId) {
+            this._registry.disconnect(this._registrySignalId);
+            this._registrySignalId = 0;
+        }
+
+        if (this._settings && this._settingsSignalId) {
+            this._settings.disconnect(this._settingsSignalId);
+            this._settingsSignalId = 0;
+        }
+    }
+
     _updateIndicatorState() {
-        if (this._destroyed)
+        if (this._destroyed || !this._badgeLabel || !this._badgeLabel.clutter_text)
             return;
 
         const visibleApps = this._registry.getVisibleApps();

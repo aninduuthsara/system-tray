@@ -548,6 +548,7 @@ export class TrayPopupView {
 
         if (!needConfirm || this._pendingConfirmIds.has(id)) {
             this._clearConfirmState(id);
+            this._rootBox?.grab_key_focus?.();
             this._actions.forceQuitApp(record).catch(() => {});
             return;
         }

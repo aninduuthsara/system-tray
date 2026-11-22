@@ -59,6 +59,7 @@ export class TrayPopupView {
         this._liveTimerId = 0;
         this._measureIdleId = 0;
         this._isOpen = false;
+        this._destroyed = false;
 
         this._buildRoot();
         this._registrySignalId = this._registry.connect('changed', () => {
@@ -358,7 +359,7 @@ export class TrayPopupView {
 
         this._measureIdleId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
             this._measureIdleId = 0;
-            if (!this._listBox || !this._scrollView)
+            if (this._destroyed || !this._listBox || !this._scrollView)
                 return GLib.SOURCE_REMOVE;
 
             const children = this._listBox.get_children();
@@ -584,6 +585,7 @@ export class TrayPopupView {
     }
 
     destroy() {
+        this._destroyed = true;
         this._stopLiveRefresh();
         if (this._measureIdleId) {
             GLib.source_remove(this._measureIdleId);

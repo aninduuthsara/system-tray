@@ -305,6 +305,7 @@ export class ApplicationRegistry extends EventEmitter {
         const {
             canonicalHint,
             appId,
+            resolvedDesktopId,
             unitName,
             pids = [],
             sniKey,
@@ -313,14 +314,23 @@ export class ApplicationRegistry extends EventEmitter {
         } = payload;
 
         const candidateNorms = new Set();
-        for (const val of [canonicalHint, appId, ...aliases]) {
+        for (const val of [canonicalHint, appId, resolvedDesktopId, ...aliases]) {
             const norm = normalizeId(val);
             if (norm)
                 candidateNorms.add(norm);
         }
 
+        const resolvedNorm = normalizeId(resolvedDesktopId);
+
         for (const record of this._records.values()) {
-            if (unitName && record.unitNames.has(unitName))
+            const recordNorm = normalizeId(record.canonicalId);
+            const hasDistinctDesktopIds =
+                resolvedNorm &&
+                record.desktopAppInfo &&
+                recordNorm &&
+                resolvedNorm !== recordNorm;
+
+            if (!hasDistinctDesktopIds && unitName && record.unitNames.has(unitName))
                 return record;
 
             if (sniKey && record.sniItems.has(sniKey))
@@ -329,9 +339,11 @@ export class ApplicationRegistry extends EventEmitter {
             if (customRuleId && record.customRules.has(customRuleId))
                 return record;
 
-            for (const pid of pids) {
-                if (pid > 0 && record.pids.has(pid))
-                    return record;
+            if (!hasDistinctDesktopIds) {
+                for (const pid of pids) {
+                    if (pid > 0 && record.pids.has(pid))
+                        return record;
+                }
             }
 
             if (candidateNorms.has(normalizeId(record.canonicalId)))
@@ -396,6 +408,7 @@ export class ApplicationRegistry extends EventEmitter {
         let record = this._findMatchingRecord({
             canonicalHint,
             appId: payload.appId,
+            resolvedDesktopId: desktopLookup.resolvedId,
             unitName: payload.unitName,
             pids,
             sniKey: payload.sniKey,
@@ -841,6 +854,33 @@ export class ApplicationRegistry extends EventEmitter {
      */
     getWindowsForRecord(record) {
         return this._getRecordNormalWindows(record);
+    }
+
+    /**
+     * Collect PIDs belonging to other tracked desktop apps so killing one app
+     * never kills another app launched from inside the same cgroup (e.g. Files -> Document Viewer).
+     */
+    getOtherAppPids(excludeCanonicalId) {
+        const others = new Set();
+        for (const [id, rec] of this._records.entries()) {
+            if (id === excludeCanonicalId)
+                continue;
+            if (!this._isEligibleApp(rec))
+                continue;
+            for (const p of rec.pids) {
+                if (p > 1)
+                    others.add(p);
+            }
+            for (const p of rec.shellApp?.get_pids?.() ?? []) {
+                if (p > 1)
+                    others.add(p);
+            }
+            for (const item of rec.sniItems.values()) {
+                if (item.pid > 1)
+                    others.add(item.pid);
+            }
+        }
+        return others;
     }
 
     _scheduleEmit() {

@@ -2,7 +2,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-import {normalizeId} from './registry.js';
+import {extractAppIdFromUnit, normalizeId} from './registry.js';
 
 const SYSTEMD_BUS = 'org.freedesktop.systemd1';
 const SYSTEMD_PATH = '/org/freedesktop/systemd1';
@@ -48,13 +48,13 @@ async function readTextFileAsync(path, cancellable) {
     return new TextDecoder().decode(bytes);
 }
 
-async function collectDescendantPidsAsync(rootPids, cancellable) {
+async function collectDescendantPidsAsync(rootPids, cancellable, stopPids = new Set()) {
     const visited = new Set();
-    const queue = [...rootPids].filter(p => Number.isInteger(p) && p > 1);
+    const queue = [...rootPids].filter(p => Number.isInteger(p) && p > 1 && !stopPids.has(p));
 
     while (queue.length > 0 && !cancellable.is_cancelled()) {
         const pid = queue.shift();
-        if (visited.has(pid))
+        if (visited.has(pid) || stopPids.has(pid))
             continue;
         visited.add(pid);
 
@@ -86,8 +86,14 @@ async function collectDescendantPidsAsync(rootPids, cancellable) {
                     );
                     for (const token of childrenTxt.trim().split(/\s+/)) {
                         const childPid = parseInt(token, 10);
-                        if (Number.isInteger(childPid) && childPid > 1 && !visited.has(childPid))
+                        if (
+                            Number.isInteger(childPid) &&
+                            childPid > 1 &&
+                            !visited.has(childPid) &&
+                            !stopPids.has(childPid)
+                        ) {
                             queue.push(childPid);
+                        }
                     }
                 } catch {
                     // Thread may have exited
@@ -151,9 +157,25 @@ async function getProcInfoAsync(pid, cancellable) {
 const PROTECTED_SYSTEM_PROCS = new Set([
     'systemd', 'gnome-shell', 'mutter', 'xwayland', 'gdm', 'gdm-wayland-session',
     'gnome-session', 'gnome-session-binary', 'dbus-daemon', 'dbus-broker',
-    'pipewire', 'wireplumber', 'xdg-desktop-portal', 'xdg-document-portal',
-    'xdg-permission-store', 'gsd-xsettings', 'ibus-daemon', 'at-spi-bus-launcher',
+    'pipewire', 'wireplumber', 'dconf-service', 'gnome-keyring-daemon', 'bwrap',
+    'flatpak-session-helper',
 ]);
+
+function isProtectedProcName(comm) {
+    if (!comm)
+        return true;
+    const c = comm.toLowerCase();
+    if (PROTECTED_SYSTEM_PROCS.has(c))
+        return true;
+    return (
+        c.startsWith('gsd-') ||
+        c.startsWith('xdg-') ||
+        c.startsWith('gvfs') ||
+        c.startsWith('at-spi') ||
+        c.startsWith('ibus') ||
+        c.startsWith('gnome-session')
+    );
+}
 
 function isSafeAppUnitName(unitName) {
     if (!unitName || typeof unitName !== 'string')
@@ -167,14 +189,31 @@ function isSafeAppUnitName(unitName) {
     );
 }
 
-async function resolveAppFamilyPidsAsync(seedPids, cancellable) {
+function unitBelongsToRecord(unitName, record) {
+    const unitAppId = normalizeId(extractAppIdFromUnit(unitName));
+    if (!unitAppId)
+        return false;
+
+    const recordNorm = normalizeId(record.canonicalId);
+    if (recordNorm && (unitAppId === recordNorm || unitAppId.endsWith(`.${recordNorm}`) || recordNorm.endsWith(`.${unitAppId}`)))
+        return true;
+
+    for (const alias of record.aliases) {
+        const aliasNorm = normalizeId(alias);
+        if (aliasNorm && (unitAppId === aliasNorm || unitAppId.endsWith(`.${aliasNorm}`)))
+            return true;
+    }
+    return false;
+}
+
+async function resolveAppFamilyPidsAsync(seedPids, cancellable, stopPids = new Set()) {
     const roots = new Set();
 
     for (const pid of seedPids) {
-        if (!Number.isInteger(pid) || pid <= 1)
+        if (!Number.isInteger(pid) || pid <= 1 || stopPids.has(pid))
             continue;
         const info = await getProcInfoAsync(pid, cancellable);
-        if (!info.comm || PROTECTED_SYSTEM_PROCS.has(info.comm))
+        if (isProtectedProcName(info.comm))
             continue;
 
         roots.add(pid);
@@ -182,8 +221,10 @@ async function resolveAppFamilyPidsAsync(seedPids, cancellable) {
         // Walk upward ONLY while parent belongs to the exact same app
         let cur = info;
         for (let depth = 0; depth < 4 && cur.ppid > 1; depth++) {
+            if (stopPids.has(cur.ppid))
+                break;
             const pInfo = await getProcInfoAsync(cur.ppid, cancellable);
-            if (!pInfo.comm || NEVER_KILL_PARENTS.has(pInfo.comm) || PROTECTED_SYSTEM_PROCS.has(pInfo.comm))
+            if (!pInfo.comm || NEVER_KILL_PARENTS.has(pInfo.comm) || isProtectedProcName(pInfo.comm))
                 break;
 
             const sameComm = cur.comm && pInfo.comm === cur.comm;
@@ -204,11 +245,13 @@ async function resolveAppFamilyPidsAsync(seedPids, cancellable) {
     if (roots.size === 0)
         return [];
 
-    const family = await collectDescendantPidsAsync([...roots], cancellable);
+    const family = await collectDescendantPidsAsync([...roots], cancellable, stopPids);
     const safePids = [];
     for (const pid of family) {
+        if (stopPids.has(pid))
+            continue;
         const pInfo = await getProcInfoAsync(pid, cancellable);
-        if (pInfo.comm && !PROTECTED_SYSTEM_PROCS.has(pInfo.comm))
+        if (!isProtectedProcName(pInfo.comm))
             safePids.push(pid);
     }
     return safePids;
@@ -479,6 +522,31 @@ export class ActionsManager {
         return null;
     }
 
+    async _unitSharesOtherApp(unitName, record, otherAppPids) {
+        if (!unitBelongsToRecord(unitName, record))
+            return true;
+
+        try {
+            const procsReply = await dbusCallAsync(
+                SYSTEMD_BUS,
+                SYSTEMD_PATH,
+                SYSTEMD_MANAGER_IFACE,
+                'GetUnitProcesses',
+                new GLib.Variant('(s)', [unitName]),
+                new GLib.VariantType('(a(sus))'),
+                this._cancellable
+            );
+            const [procs] = procsReply.recursiveUnpack();
+            for (const [_cgroup, pid] of procs) {
+                if (otherAppPids.has(pid))
+                    return true;
+            }
+        } catch {
+            // Unit inaccessible
+        }
+        return false;
+    }
+
     async forceQuitApp(record) {
         if (!record)
             return false;
@@ -488,45 +556,61 @@ export class ActionsManager {
         const mode = this._settings?.get_string('force-quit-mode') ?? 'immediate';
         const graceMs = this._settings?.get_int('force-quit-grace-ms') ?? 800;
 
-        // Gather every known PID from all sources (systemd, shellApp, SNI, windows)
-        const seedPids = new Set(record.pids);
+        // PIDs belonging to OTHER tracked apps (prevents Files <-> Document Viewer collateral kills!)
+        const otherAppPids = this._registry.getOtherAppPids(record.canonicalId);
+
+        // Prefer authoritative Shell.App / Window / SNI PIDs, excluding PIDs owned by other apps
+        const seedPids = new Set();
         for (const p of record.shellApp?.get_pids?.() ?? []) {
-            if (p > 1)
+            if (p > 1 && !otherAppPids.has(p))
                 seedPids.add(p);
         }
         for (const item of record.sniItems.values()) {
-            if (item.pid > 1)
+            if (item.pid > 1 && !otherAppPids.has(item.pid))
                 seedPids.add(item.pid);
         }
         for (const win of this._registry.getWindowsForRecord(record)) {
             const wp = win.get_pid?.() ?? 0;
-            if (wp > 1)
+            if (wp > 1 && !otherAppPids.has(wp))
                 seedPids.add(wp);
         }
-
-        // Resolve systemd unit even if not yet linked
-        const units = new Set(record.unitNames);
-        if (units.size === 0 && seedPids.size > 0) {
-            const discoveredUnit = await this._lookupAppUnitByPids(seedPids);
-            if (discoveredUnit)
-                units.add(discoveredUnit);
+        for (const p of record.pids) {
+            if (p > 1 && !otherAppPids.has(p))
+                seedPids.add(p);
         }
 
-        if (units.size > 0) {
+        // Only use KillUnit if the unit belongs to THIS app AND no other tracked app lives inside it
+        const candidateUnits = new Set(record.unitNames);
+        if (candidateUnits.size === 0 && seedPids.size > 0) {
+            const discoveredUnit = await this._lookupAppUnitByPids(seedPids);
+            if (discoveredUnit)
+                candidateUnits.add(discoveredUnit);
+        }
+
+        const safeUnits = new Set();
+        for (const u of candidateUnits) {
+            if (!isSafeAppUnitName(u))
+                continue;
+            const isShared = await this._unitSharesOtherApp(u, record, otherAppPids);
+            if (!isShared)
+                safeUnits.add(u);
+        }
+
+        if (safeUnits.size > 0) {
             if (mode === 'escalate') {
-                await this._killSystemdUnits(units, 15);
+                await this._killSystemdUnits(safeUnits, 15);
                 await this._delay(graceMs);
                 if (this._cancellable.is_cancelled())
                     return false;
             }
-            await this._killSystemdUnits(units, 9);
+            await this._killSystemdUnits(safeUnits, 9);
         }
 
-        // Always sweep any remaining app family / sibling processes if needed
+        // Targeted process-tree kill (stops cleanly at otherAppPids & system process boundaries)
         if (seedPids.size > 0) {
-            const familyPids = await resolveAppFamilyPidsAsync([...seedPids], this._cancellable);
+            const familyPids = await resolveAppFamilyPidsAsync([...seedPids], this._cancellable, otherAppPids);
             if (familyPids.length > 0) {
-                if (mode === 'escalate' && units.size === 0) {
+                if (mode === 'escalate' && safeUnits.size === 0) {
                     await spawnKillAsync(15, familyPids, this._cancellable);
                     await this._delay(graceMs);
                     if (this._cancellable.is_cancelled())

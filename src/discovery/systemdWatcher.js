@@ -339,6 +339,9 @@ export class SystemdWatcher {
             else if (cmdHint.toLowerCase().includes('.appimage'))
                 packaging = PackagingType.APPIMAGE;
 
+            if (this._cancellable.is_cancelled())
+                return;
+
             const extractedId = extractAppIdFromUnit(unitName);
             const rawDesc = unitProps.Description || '';
             const cleanDesc = /^(dbus-|app-)/i.test(rawDesc) ? '' : rawDesc;

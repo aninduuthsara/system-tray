@@ -101,7 +101,11 @@ async function readCgroupInfoAsync(pid, cancellable) {
             const text = decoder.decode(bytes).trim();
             const parts = text.split('/');
             const last = parts[parts.length - 1] ?? '';
-            if (last.endsWith('.scope') || last.endsWith('.service'))
+            const isSafeAppUnit =
+                /^app-(?:flatpak|gnome|kde)-.+\.scope$/i.test(last) ||
+                /^app-.+@autostart\.service$/i.test(last) ||
+                /^dbus-:[\d.]+-.+@\d+\.service$/i.test(last);
+            if (isSafeAppUnit && !/gnome\.shell|gnome\.session|dbus-broker|xdg-desktop-portal|gsd-/i.test(last))
                 out.unitName = last;
         }
     } catch {

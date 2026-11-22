@@ -388,9 +388,11 @@ export class SystemdWatcher {
                     pids,
                     processCount: pids.length,
                 });
+            } else {
+                this._handleUnitGone(unitName);
             }
         } catch {
-            // Unit exited
+            this._handleUnitGone(unitName);
         }
     }
 
